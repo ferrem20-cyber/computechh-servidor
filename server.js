@@ -33,6 +33,10 @@ app.post("/crear-preferencia", async (req, res) => {
           unit_price: Number(price),
         },
       ],
+
+        payer: {
+          email: "cliente@computechh.com",
+          },
       back_urls: {
         success: "https://computechh.netlify.app/success.html",
         failure: "https://computechh.netlify.app/failure.html",

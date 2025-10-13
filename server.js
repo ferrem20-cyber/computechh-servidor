@@ -3,14 +3,22 @@ import fetch from "node-fetch";
 import cors from "cors";
 
 const app = express();
-app.use(cors());
 app.use(express.json());
 
-const ACCESS_TOKEN = "APP_USR-4643369270008836-101220-29b0c1ee3c2dd02eb8d1d8e082c445b5-2919258415";
+// ======== CONFIGURAR CORS CORRECTAMENTE ========
+app.use(cors({
+  origin: "https://computechh.netlify.app", // ✅ dominio real de tu frontend en Netlify
+  methods: ["GET", "POST"],
+  credentials: false
+}));
 
+// ======== TOKEN REAL DE MERCADO PAGO ========
+const ACCESS_TOKEN = process.env.ACCESS_TOKEN; 
+
+// ======== ENDPOINT PARA CREAR PREFERENCIA ========
 app.post("/crear-preferencia", async (req, res) => {
   try {
-    const { title, price } = req.body; // <-- recibimos los datos desde el frontend
+    const { title, price } = req.body;
 
     if (!title || !price) {
       return res.status(400).json({ error: "Faltan datos del producto o precio" });
@@ -19,7 +27,7 @@ app.post("/crear-preferencia", async (req, res) => {
     const body = {
       items: [
         {
-          title: title,
+          title,
           quantity: 1,
           currency_id: "MXN",
           unit_price: Number(price),
@@ -56,7 +64,8 @@ app.post("/crear-preferencia", async (req, res) => {
   }
 });
 
-app.listen(process.env.PORT || 3000, () =>
-  console.log(`✅ Servidor corriendo en puerto ${process.env.PORT || 3000}`)
-);
+// ======== PUERTO DE RENDER ========
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => console.log(`✅ Servidor corriendo en puerto ${PORT}`));
+
 

@@ -3,10 +3,14 @@ import fetch from "node-fetch";
 import cors from "cors";
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: "https://tusitio.netlify.app"  // o puedes especificar tu dominio de Netlify si quieres restringirlo
+}));
+
 app.use(express.json());
 
-const ACCESS_TOKEN = "APP_USR-4643369270008836-101220-29b0c1ee3c2dd02eb8d1d8e082c445b5-2919258415";
+const ACCESS_TOKEN = process.env.ACCESS_TOKEN;
+
 
 app.post("/crear-preferencia", async (req, res) => {
   try {

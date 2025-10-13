@@ -4,7 +4,7 @@ import cors from "cors";
 
 const app = express();
 app.use(cors({
-  origin: "https://tusitio.netlify.app"  // o puedes especificar tu dominio de Netlify si quieres restringirlo
+  origin: "https://computechh.netlify.app"  // o puedes especificar tu dominio de Netlify si quieres restringirlo
 }));
 
 app.use(express.json());

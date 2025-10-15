@@ -7,36 +7,35 @@ app.use(express.json());
 
 // ======== CONFIGURAR CORS CORRECTAMENTE ========
 app.use(cors({
-  origin: "https://computechh.netlify.app", // ✅ dominio real de tu frontend en Netlify
+  origin: "https://computechh.netlify.app", // ✅ tu dominio real en Netlify
   methods: ["GET", "POST"],
   credentials: false
 }));
 
 // ======== TOKEN REAL DE MERCADO PAGO ========
-const ACCESS_TOKEN = process.env.ACCESS_TOKEN; 
+const ACCESS_TOKEN = process.env.ACCESS_TOKEN || "TEST-xxxxxxxxxxxxxxxxxxxxxxxxxx"; // ⚠️ Usa tu token real o de prueba aquí
 
 // ======== ENDPOINT PARA CREAR PREFERENCIA ========
 app.post("/crear-preferencia", async (req, res) => {
   try {
-    const { title, price } = req.body;
+    const { total, descripcion } = req.body; // ← ahora coincide con checkout.html
 
-    if (!title || !price) {
-      return res.status(400).json({ error: "Faltan datos del producto o precio" });
+    if (!total) {
+      return res.status(400).json({ error: "Falta el total de la compra" });
     }
 
     const body = {
       items: [
         {
-          title,
+          title: descripcion || "Compra en Computechh",
           quantity: 1,
           currency_id: "MXN",
-          unit_price: Number(price),
+          unit_price: Number(total),
         },
       ],
-
-        payer: {
-          email: "cliente@computechh.com",
-          },
+      payer: {
+        email: "cliente@computechh.com", // opcional, puedes pasarlo dinámico luego
+      },
       back_urls: {
         success: "https://computechh.netlify.app/success.html",
         failure: "https://computechh.netlify.app/failure.html",
@@ -57,7 +56,7 @@ app.post("/crear-preferencia", async (req, res) => {
     const data = await response.json();
 
     if (data.init_point) {
-      res.json({ url: data.init_point });
+      res.json({ init_point: data.init_point }); // ✅ el frontend usa "init_point"
     } else {
       console.error("Error al crear preferencia:", data);
       res.status(500).json({ error: "No se pudo crear la preferencia de pago", data });
@@ -71,5 +70,3 @@ app.post("/crear-preferencia", async (req, res) => {
 // ======== PUERTO DE RENDER ========
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => console.log(`✅ Servidor corriendo en puerto ${PORT}`));
-
-

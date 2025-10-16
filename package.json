@@ -1,18 +1,18 @@
 {
   "name": "computechh-servidor",
   "version": "1.0.0",
-  "description": "",
+  "description": "Servidor backend de Computechh para pagos y autenticación",
   "main": "server.js",
   "type": "module",
   "scripts": {
     "start": "node server.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "dependencies": {
+    "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
-    "express": "^4.19.2",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "mongodb": "^6.20.0",
     "node-fetch": "^3.3.2"
   }
 }

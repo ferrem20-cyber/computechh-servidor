@@ -175,6 +175,96 @@ app.post("/cambiar", async (req, res) => {
   }
 });
 
+// ======= DIRECCIONES DEL USUARIO =======
+
+// Guardar una nueva dirección
+app.post("/guardar-direccion", async (req, res) => {
+  try {
+    const { email, nombre, direccion, ciudad, estado, cp } = req.body;
+
+    if (!email || !nombre || !direccion || !ciudad || !estado || !cp) {
+      return res.status(400).json({ error: "Faltan datos para guardar la dirección." });
+    }
+
+    const user = await Usuario.findOne({ email });
+    if (!user) return res.status(404).json({ error: "Usuario no encontrado." });
+
+    if (!user.direcciones) user.direcciones = [];
+    user.direcciones.push({ nombre, direccion, ciudad, estado, cp });
+
+    await user.save();
+
+    res.json({ ok: true, message: "Dirección guardada correctamente." });
+  } catch (error) {
+    console.error("❌ Error al guardar dirección:", error);
+    res.status(500).json({ error: "Error al guardar dirección." });
+  }
+});
+
+// Obtener todas las direcciones del usuario
+app.get("/direcciones/:email", async (req, res) => {
+  try {
+    const { email } = req.params;
+    const user = await Usuario.findOne({ email });
+    if (!user) return res.status(404).json({ error: "Usuario no encontrado." });
+
+    res.json(user.direcciones || []);
+  } catch (error) {
+    console.error("❌ Error al obtener direcciones:", error);
+    res.status(500).json({ error: "Error al obtener direcciones." });
+  }
+});
+
+// ======= HISTORIAL DE ÓRDENES DEL USUARIO =======
+
+// Guardar una nueva orden (cuando el usuario realiza una compra)
+app.post("/guardar-orden", async (req, res) => {
+  try {
+    const { email, productos, total, fecha } = req.body;
+
+    if (!email || !productos || !total) {
+      return res.status(400).json({ error: "Faltan datos para guardar la orden." });
+    }
+
+    const usuarios = db.collection("usuarios");
+    const user = await usuarios.findOne({ email });
+
+    if (!user) return res.status(404).json({ error: "Usuario no encontrado." });
+
+    if (!user.ordenes) user.ordenes = [];
+
+    user.ordenes.push({
+      productos,
+      total,
+      fecha: fecha || new Date(),
+      estado: "Completado"
+    });
+
+    await usuarios.updateOne({ email }, { $set: { ordenes: user.ordenes } });
+
+    res.json({ ok: true, message: "Orden guardada correctamente." });
+  } catch (error) {
+    console.error("❌ Error al guardar orden:", error);
+    res.status(500).json({ error: "Error al guardar orden." });
+  }
+});
+
+// Obtener todas las órdenes de un usuario
+app.get("/ordenes/:email", async (req, res) => {
+  try {
+    const { email } = req.params;
+    const usuarios = db.collection("usuarios");
+    const user = await usuarios.findOne({ email });
+    if (!user) return res.status(404).json({ error: "Usuario no encontrado." });
+
+    res.json(user.ordenes || []);
+  } catch (error) {
+    console.error("❌ Error al obtener órdenes:", error);
+    res.status(500).json({ error: "Error al obtener órdenes." });
+  }
+});
+
+
 // ======== INICIAR SERVIDOR ========
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, async () => {

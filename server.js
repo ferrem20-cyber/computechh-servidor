@@ -177,6 +177,8 @@ app.post("/cambiar", async (req, res) => {
 
 // ======= DIRECCIONES DEL USUARIO =======
 
+// ======= DIRECCIONES DEL USUARIO (versión corregida) =======
+
 // Guardar una nueva dirección
 app.post("/guardar-direccion", async (req, res) => {
   try {
@@ -186,13 +188,16 @@ app.post("/guardar-direccion", async (req, res) => {
       return res.status(400).json({ error: "Faltan datos para guardar la dirección." });
     }
 
-    const user = await Usuario.findOne({ email });
+    const usuarios = db.collection("usuarios");
+    const user = await usuarios.findOne({ email });
     if (!user) return res.status(404).json({ error: "Usuario no encontrado." });
 
-    if (!user.direcciones) user.direcciones = [];
-    user.direcciones.push({ nombre, direccion, ciudad, estado, cp });
+    // Añadir dirección
+    const nuevaDireccion = { nombre, direccion, ciudad, estado, cp };
+    const direcciones = user.direcciones || [];
+    direcciones.push(nuevaDireccion);
 
-    await user.save();
+    await usuarios.updateOne({ email }, { $set: { direcciones } });
 
     res.json({ ok: true, message: "Dirección guardada correctamente." });
   } catch (error) {
@@ -205,7 +210,9 @@ app.post("/guardar-direccion", async (req, res) => {
 app.get("/direcciones/:email", async (req, res) => {
   try {
     const { email } = req.params;
-    const user = await Usuario.findOne({ email });
+
+    const usuarios = db.collection("usuarios");
+    const user = await usuarios.findOne({ email });
     if (!user) return res.status(404).json({ error: "Usuario no encontrado." });
 
     res.json(user.direcciones || []);
@@ -214,6 +221,7 @@ app.get("/direcciones/:email", async (req, res) => {
     res.status(500).json({ error: "Error al obtener direcciones." });
   }
 });
+
 
 // ======= HISTORIAL DE ÓRDENES DEL USUARIO =======
 

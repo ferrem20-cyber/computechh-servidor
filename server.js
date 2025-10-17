@@ -3,18 +3,20 @@ import fetch from "node-fetch";
 import cors from "cors";
 import "dotenv/config";
 import { MongoClient } from "mongodb";
+import bcrypt from "bcryptjs";
 
 // ======== CONFIGURACIÓN DEL SERVIDOR ========
 const app = express();
 app.use(express.json());
 
-app.use(cors({
-  origin: ["https://computechh.netlify.app", "http://localhost:3000"],
-  methods: ["GET", "POST"],
-  allowedHeaders: ["Content-Type"],
-  credentials: true
-}));
-
+app.use(
+  cors({
+    origin: ["https://computechh.netlify.app", "http://localhost:3000"],
+    methods: ["GET", "POST"],
+    allowedHeaders: ["Content-Type"],
+    credentials: true,
+  })
+);
 
 // ======== VARIABLES DE ENTORNO ========
 const ACCESS_TOKEN = process.env.ACCESS_TOKEN;
@@ -35,37 +37,31 @@ async function conectarDB() {
   }
 }
 
-// ======== ENDPOINT: REGISTRO DE USUARIO ========
+// ======== ENDPOINT: REGISTRO ========
 app.post("/registro", async (req, res) => {
   try {
     const { nombre, apellidos, email, password } = req.body;
-
-    if (!nombre || !email || !password) {
+    if (!nombre || !email || !password)
       return res.status(400).json({ error: "Faltan datos obligatorios." });
-    }
 
     const usuarios = db.collection("usuarios");
-
     const existe = await usuarios.findOne({ email });
-    if (existe) {
+    if (existe)
       return res.status(409).json({ error: "El correo ya está registrado." });
-    }
 
     const nuevoUsuario = {
       nombre,
       apellidos,
       email,
       password,
-      fechaRegistro: new Date()
+      fechaRegistro: new Date(),
     };
 
     await usuarios.insertOne(nuevoUsuario);
-
     res.status(201).json({
       mensaje: "Usuario registrado correctamente.",
-      usuario: { nombre, email }
+      usuario: { nombre, email },
     });
-
   } catch (error) {
     console.error("Error en /registro:", error);
     res.status(500).json({ error: "Error en el servidor." });
@@ -79,30 +75,29 @@ app.post("/login", async (req, res) => {
     const usuarios = db.collection("usuarios");
 
     const user = await usuarios.findOne({ email });
-    if (!user) {
-      return res.status(404).json({ error: "Usuario no encontrado." });
-    }
+    if (!user) return res.status(404).json({ error: "Usuario no encontrado." });
 
-    if (user.password !== password) {
+    if (user.password !== password)
       return res.status(401).json({ error: "Contraseña incorrecta." });
-    }
 
     res.json({
       mensaje: "Inicio de sesión exitoso",
-      usuario: { nombre: user.nombre, email: user.email }
+      usuario: { nombre: user.nombre, email: user.email },
     });
-
   } catch (error) {
     console.error("Error en /login:", error);
     res.status(500).json({ error: "Error en el servidor." });
   }
 });
 
-// ======== ENDPOINT MERCADO PAGO ========
+// ======== ENDPOINT: MERCADO PAGO ========
 app.post("/crear-preferencia", async (req, res) => {
   try {
     const { title, price } = req.body;
-    if (!title || !price) return res.status(400).json({ error: "Faltan datos del producto o precio" });
+    if (!title || !price)
+      return res
+        .status(400)
+        .json({ error: "Faltan datos del producto o precio" });
 
     const body = {
       items: [
@@ -117,26 +112,66 @@ app.post("/crear-preferencia", async (req, res) => {
       auto_return: "approved",
     };
 
-    const response = await fetch("https://api.mercadopago.com/checkout/preferences", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${ACCESS_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
+    const response = await fetch(
+      "https://api.mercadopago.com/checkout/preferences",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${ACCESS_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      }
+    );
 
     const data = await response.json();
-
-    if (data.init_point) {
-      res.json({ url: data.init_point });
-    } else {
-      console.error("Error al crear preferencia:", data);
-      res.status(500).json({ error: "No se pudo crear la preferencia de pago", data });
-    }
+    if (data.init_point) res.json({ url: data.init_point });
+    else res.status(500).json({ error: "No se pudo crear la preferencia" });
   } catch (error) {
     console.error("Error del servidor:", error);
     res.status(500).json({ error: "Error interno del servidor" });
+  }
+});
+
+// ======== ENDPOINT: RECUPERAR CONTRASEÑA ========
+app.post("/recuperar", async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email)
+      return res.status(400).json({ error: "El correo es obligatorio." });
+
+    const usuarios = db.collection("usuarios");
+    const usuario = await usuarios.findOne({ email });
+
+    if (!usuario)
+      return res.status(404).json({ error: "No existe una cuenta con ese correo." });
+
+    // Solo confirma que existe para redirigir al paso de cambio
+    res.json({ mensaje: "Usuario encontrado", email: usuario.email });
+  } catch (error) {
+    console.error("❌ Error en /recuperar:", error);
+    res.status(500).json({ error: "Error interno del servidor." });
+  }
+});
+
+// ======== ENDPOINT: CAMBIAR CONTRASEÑA ========
+app.post("/cambiar", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password)
+      return res.status(400).json({ error: "Correo y nueva contraseña requeridos." });
+
+    const usuarios = db.collection("usuarios");
+    const usuario = await usuarios.findOne({ email });
+    if (!usuario)
+      return res.status(404).json({ error: "Usuario no encontrado." });
+
+    await usuarios.updateOne({ email }, { $set: { password } });
+
+    res.json({ mensaje: "Contraseña actualizada con éxito", nombre: usuario.nombre });
+  } catch (error) {
+    console.error("❌ Error en /cambiar:", error);
+    res.status(500).json({ error: "Error interno del servidor." });
   }
 });
 

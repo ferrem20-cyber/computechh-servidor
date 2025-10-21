@@ -57,7 +57,16 @@ app.post("/actualizar-stock", async (req, res) => {
   try {
     if (!client) throw new Error("Cliente MongoDB no inicializado");
 
-    const nuevoStock = req.body;
+    console.log("📩 Datos recibidos del frontend:", req.body);
+
+    // Aseguramos que req.body sea un objeto válido
+    const nuevoStock = typeof req.body === "object" ? req.body : JSON.parse(req.body || "{}");
+
+    if (Object.keys(nuevoStock).length === 0) {
+      console.warn("⚠️ No se recibieron datos válidos de stock.");
+      return res.status(400).json({ error: "Cuerpo vacío o inválido" });
+    }
+
     const db = client.db("computechh");
     const collection = db.collection("stock");
 

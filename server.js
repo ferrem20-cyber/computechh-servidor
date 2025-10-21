@@ -286,36 +286,42 @@ app.listen(PORT, async () => {
 });
 
 /***********************************
- * 🧩 ENDPOINTS DE STOCK GLOBAL
+ * 🧩 ENDPOINTS DE STOCK GLOBAL (versión MongoDB)
  ***********************************/
-import fs from "fs";
-
-const STOCK_FILE = "./stock.json";
-
-// 🔹 Obtener stock actual
-app.get("/stock", (req, res) => {
+app.get("/stock", async (req, res) => {
   try {
-    if (!fs.existsSync(STOCK_FILE)) {
-      fs.writeFileSync(STOCK_FILE, JSON.stringify({}), "utf8");
-    }
-    const data = fs.readFileSync(STOCK_FILE, "utf8");
-    res.json(JSON.parse(data || "{}"));
+    const db = client.db("computechh");
+    const collection = db.collection("stock");
+    const items = await collection.find().toArray();
+
+    const stockData = {};
+    items.forEach(item => {
+      stockData[item.name] = item.stock;
+    });
+
+    res.json(stockData);
   } catch (err) {
-    console.error("Error leyendo stock.json:", err);
+    console.error("❌ Error al obtener stock:", err);
     res.status(500).json({ error: "Error al obtener stock" });
   }
 });
 
-// 🔹 Actualizar stock
 app.post("/actualizar-stock", async (req, res) => {
   try {
     const nuevoStock = req.body;
-    fs.writeFileSync(STOCK_FILE, JSON.stringify(nuevoStock, null, 2), "utf8");
-    console.log("✅ Stock actualizado:", nuevoStock);
+    const db = client.db("computechh");
+    const collection = db.collection("stock");
+
+    await collection.deleteMany({});
+    const docs = Object.entries(nuevoStock).map(([name, stock]) => ({ name, stock }));
+    await collection.insertMany(docs);
+
+    console.log("✅ Stock actualizado en MongoDB:", docs);
     res.json({ success: true });
   } catch (err) {
-    console.error("Error actualizando stock:", err);
+    console.error("❌ Error al guardar stock:", err);
     res.status(500).json({ error: "Error al guardar stock" });
   }
 });
+
 

@@ -225,30 +225,33 @@ app.get("/direcciones/:email", async (req, res) => {
 
 // ======= HISTORIAL DE ÓRDENES DEL USUARIO =======
 
-// Guardar una nueva orden (cuando el usuario realiza una compra)
+// ======= HISTORIAL DE ÓRDENES =======
+
+// Guardar una nueva orden
 app.post("/guardar-orden", async (req, res) => {
   try {
-    const { email, productos, total, fecha } = req.body;
+    const { email, productos, total, metodoPago, estado } = req.body;
 
-    if (!email || !productos || !total) {
-      return res.status(400).json({ error: "Faltan datos para guardar la orden." });
+    if (!email || !productos || productos.length === 0 || !total) {
+      return res.status(400).json({ error: "Datos incompletos para registrar la orden." });
     }
 
     const usuarios = db.collection("usuarios");
     const user = await usuarios.findOne({ email });
-
     if (!user) return res.status(404).json({ error: "Usuario no encontrado." });
 
-    if (!user.ordenes) user.ordenes = [];
-
-    user.ordenes.push({
+    const nuevaOrden = {
       productos,
       total,
-      fecha: fecha || new Date(),
-      estado: "Completado"
-    });
+      metodoPago: metodoPago || "Mercado Pago",
+      estado: estado || "pendiente",
+      fecha: new Date(),
+    };
 
-    await usuarios.updateOne({ email }, { $set: { ordenes: user.ordenes } });
+    const ordenes = user.ordenes || [];
+    ordenes.push(nuevaOrden);
+
+    await usuarios.updateOne({ email }, { $set: { ordenes } });
 
     res.json({ ok: true, message: "Orden guardada correctamente." });
   } catch (error) {
@@ -261,6 +264,7 @@ app.post("/guardar-orden", async (req, res) => {
 app.get("/ordenes/:email", async (req, res) => {
   try {
     const { email } = req.params;
+
     const usuarios = db.collection("usuarios");
     const user = await usuarios.findOne({ email });
     if (!user) return res.status(404).json({ error: "Usuario no encontrado." });
@@ -273,9 +277,45 @@ app.get("/ordenes/:email", async (req, res) => {
 });
 
 
+
 // ======== INICIAR SERVIDOR ========
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, async () => {
   console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
   await conectarDB();
 });
+
+/***********************************
+ * 🧩 ENDPOINTS DE STOCK GLOBAL
+ ***********************************/
+import fs from "fs";
+
+const STOCK_FILE = "./stock.json";
+
+// 🔹 Obtener stock actual
+app.get("/stock", (req, res) => {
+  try {
+    if (!fs.existsSync(STOCK_FILE)) {
+      fs.writeFileSync(STOCK_FILE, JSON.stringify({}), "utf8");
+    }
+    const data = fs.readFileSync(STOCK_FILE, "utf8");
+    res.json(JSON.parse(data || "{}"));
+  } catch (err) {
+    console.error("Error leyendo stock.json:", err);
+    res.status(500).json({ error: "Error al obtener stock" });
+  }
+});
+
+// 🔹 Actualizar stock
+app.post("/actualizar-stock", async (req, res) => {
+  try {
+    const nuevoStock = req.body;
+    fs.writeFileSync(STOCK_FILE, JSON.stringify(nuevoStock, null, 2), "utf8");
+    console.log("✅ Stock actualizado:", nuevoStock);
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Error actualizando stock:", err);
+    res.status(500).json({ error: "Error al guardar stock" });
+  }
+});
+

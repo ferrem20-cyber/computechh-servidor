@@ -129,6 +129,53 @@ app.post("/actualizar-stock", async (req, res) => {
 });
 
 /***********************************
+ * 📦 ENDPOINTS DE DIRECCIONES (MONGODB)
+ ***********************************/
+app.post("/guardar-direccion", async (req, res) => {
+  try {
+    const { email, nombre, direccion, ciudad, estado, cp } = req.body;
+
+    if (!email || !direccion) {
+      return res.status(400).json({ error: "Datos incompletos" });
+    }
+
+    const db = client.db("computechh");
+    const direcciones = db.collection("direcciones");
+
+    await direcciones.insertOne({
+      email,
+      nombre,
+      direccion,
+      ciudad,
+      estado,
+      cp,
+      fecha: new Date()
+    });
+
+    console.log(`✅ Dirección guardada para ${email}`);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("❌ Error en /guardar-direccion:", err);
+    res.status(500).json({ error: "Error del servidor" });
+  }
+});
+
+app.get("/direcciones/:email", async (req, res) => {
+  try {
+    const { email } = req.params;
+    const db = client.db("computechh");
+    const direcciones = db.collection("direcciones");
+
+    const resultados = await direcciones.find({ email }).toArray();
+    res.json(resultados);
+  } catch (err) {
+    console.error("❌ Error en /direcciones/:email:", err);
+    res.status(500).json({ error: "Error al obtener direcciones" });
+  }
+});
+
+
+/***********************************
  * 🪙 MERCADO PAGO (YA EXISTENTE)
  ***********************************/
 app.post("/crear-preferencia", async (req, res) => {

@@ -28,6 +28,63 @@ async function conectarDB() {
 await conectarDB();
 
 /***********************************
+ * 🔐 ENDPOINTS DE USUARIO (LOGIN / REGISTRO)
+ ***********************************/
+
+// Crear cuenta
+app.post("/registro", async (req, res) => {
+  try {
+    const { nombre, email, password } = req.body;
+
+    if (!nombre || !email || !password) {
+      return res.status(400).json({ error: "Todos los campos son obligatorios" });
+    }
+
+    const db = client.db("computechh");
+    const usuarios = db.collection("usuarios");
+
+    // Verificar si el usuario ya existe
+    const existente = await usuarios.findOne({ email });
+    if (existente) {
+      return res.status(400).json({ error: "El correo ya está registrado" });
+    }
+
+    // Crear nuevo usuario
+    await usuarios.insertOne({ nombre, email, password });
+    console.log(`✅ Usuario registrado: ${email}`);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("❌ Error en /registro:", err);
+    res.status(500).json({ error: "Error del servidor" });
+  }
+});
+
+// Iniciar sesión
+app.post("/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const db = client.db("computechh");
+    const usuarios = db.collection("usuarios");
+
+    const user = await usuarios.findOne({ email, password });
+
+    if (!user) {
+      return res.status(401).json({ error: "Credenciales incorrectas" });
+    }
+
+    console.log(`✅ Usuario inició sesión: ${email}`);
+    res.json({
+      ok: true,
+      nombre: user.nombre,
+      email: user.email,
+    });
+  } catch (err) {
+    console.error("❌ Error en /login:", err);
+    res.status(500).json({ error: "Error del servidor" });
+  }
+});
+
+/***********************************
  * 🧩 ENDPOINTS DE STOCK (MONGODB)
  ***********************************/
 app.get("/stock", async (req, res) => {

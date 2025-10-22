@@ -184,7 +184,7 @@ app.post("/crear-preferencia", async (req, res) => {
     const response = await fetch("https://api.mercadopago.com/checkout/preferences", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer TEST-XXXX`, // tu token de prueba
+        "Authorization": `Bearer APP_USR-82747321-0e92-4367-beab-850423a2da0b`, // tu token de prueba
         "Content-Type": "application/json",
       },
       body: JSON.stringify({

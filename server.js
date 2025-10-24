@@ -3,6 +3,16 @@ import cors from "cors";
 import fetch from "node-fetch";
 import { MongoClient } from "mongodb";
 import fs from "fs";
+import nodemailer from "nodemailer";
+
+// 🔹 Configurar transporte de correo (usando Gmail)
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: "computechh.soporte@gmail.com", // tu correo remitente
+    pass: "ixuihueymzlramqp", // se genera desde Gmail (te explico abajo)
+  },
+});
 
 const app = express();
 const PORT = process.env.PORT || 10000;

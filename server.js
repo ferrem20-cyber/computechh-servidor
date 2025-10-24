@@ -239,55 +239,85 @@ app.post("/registrar-pedido", async (req, res) => {
       )
       .join("");
 
-    const html = `
-  <div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;margin:auto;border:1px solid #e5e7eb;border-radius:8px;background:#f9fafb;overflow:hidden;">
-    
-    <div style="background:#0f172a;color:white;padding:20px;text-align:center;">
-      <h2>🧾 Nueva compra en Computechh</h2>
-      <p>Número de pedido: <strong>${numeroPedido}</strong></p>
+    // 💌 Generar correo HTML personalizado según destinatario
+function generarHTMLPedido(pedido, numeroPedido, incluirGracias = false) {
+  const productosHTML = pedido.productos
+    .map(
+      (p) => `
+      <tr>
+        <td style="padding:8px;border-bottom:1px solid #ddd;">${p.nombre}</td>
+        <td style="padding:8px;border-bottom:1px solid #ddd;text-align:center;">${p.cantidad}</td>
+        <td style="padding:8px;border-bottom:1px solid #ddd;text-align:right;">$${p.precio_unitario.toLocaleString()}</td>
+      </tr>`
+    )
+    .join("");
+
+  return `
+    <div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;margin:auto;border:1px solid #e5e7eb;border-radius:8px;background:#f9fafb;overflow:hidden;">
+      
+      <div style="background:#0f172a;color:white;padding:20px;text-align:center;">
+        <h2>🧾 Nueva compra en Computechh</h2>
+        <p>Número de pedido: <strong>${numeroPedido}</strong></p>
+      </div>
+
+      ${
+        incluirGracias
+          ? `
+      <div style="background:#00bcd4;color:white;padding:15px;text-align:center;font-size:16px;">
+        ¡Gracias por tu compra en <strong>Computechh</strong>! 🎉<br>
+        Te contactaremos pronto con los detalles de envío.
+      </div>
+      `
+          : ""
+      }
+
+      <div style="padding:20px;">
+        <p><strong>Nombre:</strong> ${pedido.nombre}</p>
+        <p><strong>Correo:</strong> ${pedido.email}</p>
+        <p><strong>Teléfono:</strong> ${pedido.telefono}</p>
+        <p><strong>Dirección:</strong> ${pedido.direccion}, ${pedido.ciudad}, ${pedido.estado}, CP ${pedido.cp}</p>
+
+        <h3>Productos:</h3>
+        <table style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr style="background:#e2e8f0;">
+              <th style="text-align:left;padding:8px;">Producto</th>
+              <th style="text-align:center;padding:8px;">Cant.</th>
+              <th style="text-align:right;padding:8px;">Precio</th>
+            </tr>
+          </thead>
+          <tbody>${productosHTML}</tbody>
+        </table>
+
+        <h2 style="text-align:right;">Total: $${pedido.total.toLocaleString()}</h2>
+      </div>
+
+      <div style="background:#0f172a;color:white;padding:10px;text-align:center;font-size:14px;">
+        <p>© ${new Date().getFullYear()} Computechh | computechh.soporte@gmail.com</p>
+      </div>
     </div>
-
-    <!-- 💙 Mensaje de agradecimiento -->
-    <div style="background:#00bcd4;color:white;padding:15px;text-align:center;font-size:16px;">
-      ¡Gracias por tu compra en <strong>Computechh</strong>! 🎉<br>
-      Te contactaremos pronto con los detalles de envío.
-    </div>
-
-    <div style="padding:20px;">
-      <p><strong>Nombre:</strong> ${pedido.nombre}</p>
-      <p><strong>Correo:</strong> ${pedido.email}</p>
-      <p><strong>Teléfono:</strong> ${pedido.telefono}</p>
-      <p><strong>Dirección:</strong> ${pedido.direccion}, ${pedido.ciudad}, ${pedido.estado}, CP ${pedido.cp}</p>
-
-      <h3>Productos:</h3>
-      <table style="width:100%;border-collapse:collapse;">
-        <thead>
-          <tr style="background:#e2e8f0;">
-            <th style="text-align:left;padding:8px;">Producto</th>
-            <th style="text-align:center;padding:8px;">Cant.</th>
-            <th style="text-align:right;padding:8px;">Precio</th>
-          </tr>
-        </thead>
-        <tbody>${productosHTML}</tbody>
-      </table>
-
-      <h2 style="text-align:right;">Total: $${pedido.total.toLocaleString()}</h2>
-    </div>
-
-    <div style="background:#0f172a;color:white;padding:10px;text-align:center;font-size:14px;">
-      <p>© ${new Date().getFullYear()} Computechh | computechh.soporte@gmail.com</p>
-    </div>
-  </div>
-`;
+  `;
+}
 
 
-    await transporter.sendMail({
+
+    // 💌 Enviar dos correos separados: uno para Computechh, otro personalizado al cliente
+await transporter.sendMail({
   from: '"Computechh Ventas" <computechh.soporte@gmail.com>',
-  to: "computechh.soporte@gmail.com", // correo del negocio
-  cc: pedido.email, // 👈 copia al cliente (si está logueado)
-  subject: `🧾 Confirmación de compra (${numeroPedido})`,
-  html,
+  to: "computechh.soporte@gmail.com",
+  subject: `🧾 Nueva compra (${numeroPedido})`,
+  html: generarHTMLPedido(pedido, numeroPedido, false), // sin mensaje de agradecimiento
 });
+
+if (pedido.email) {
+  await transporter.sendMail({
+    from: '"Computechh Ventas" <computechh.soporte@gmail.com>',
+    to: pedido.email,
+    subject: `🧾 Confirmación de tu compra (${numeroPedido})`,
+    html: generarHTMLPedido(pedido, numeroPedido, true), // con mensaje de agradecimiento
+  });
+}
+
 
 
     console.log(`✅ Pedido ${numeroPedido} guardado y correo enviado`);

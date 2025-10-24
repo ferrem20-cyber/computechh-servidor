@@ -266,6 +266,10 @@ function generarHTMLPedido(pedido, numeroPedido, incluirGracias = false) {
       <div style="background:#00bcd4;color:white;padding:15px;text-align:center;font-size:16px;">
         ¡Gracias por tu compra en <strong>Computechh</strong>! 🎉<br>
         Te contactaremos pronto con los detalles de envío.
+        <br><br>
+        <a href="https://wa.me/526621838339" 
+           style="display:inline-block;margin-top:10px;padding:10px 20px;background:#25d366;color:white;text-decoration:none;border-radius:6px;font-weight:bold;"
+           target="_blank">📱 Contactar soporte</a>
       </div>
       `
           : ""
@@ -298,6 +302,7 @@ function generarHTMLPedido(pedido, numeroPedido, incluirGracias = false) {
     </div>
   `;
 }
+
 
 
 

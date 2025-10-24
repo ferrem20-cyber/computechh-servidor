@@ -185,7 +185,10 @@ app.get("/direcciones/:email", async (req, res) => {
 });
 
 /***********************************
- * 🧾 REGISTRAR PEDIDO Y ENVIAR CORREO HTML (CON ID ÚNICO)
+ * 🧾 REGISTRAR PEDIDO Y ENVIAR CORREO HTML (CON ID ÚNICO)--- GUARDAR PEDIDO EN HISTORIAL
+ ***********************************/
+/***********************************
+ * 🧾 REGISTRAR PEDIDO Y GUARDAR EN HISTORIAL
  ***********************************/
 app.post("/registrar-pedido", async (req, res) => {
   try {
@@ -194,23 +197,37 @@ app.post("/registrar-pedido", async (req, res) => {
       return res.status(400).json({ ok: false, error: "Datos de pedido incompletos" });
     }
 
-    // 🧩 Generar un ID único para el pedido (ejemplo: CTH-20251023-001)
-    const fecha = new Date();
-    const fechaStr = fecha.toISOString().slice(0, 10).replace(/-/g, ""); // 20251023
     const db = client.db("computechh");
     const pedidos = db.collection("pedidos");
 
-    // Contar cuántos pedidos hay hoy para generar el consecutivo
+    // Generar número de pedido único (por fecha)
+    const fecha = new Date();
+    const fechaStr = fecha.toISOString().slice(0, 10).replace(/-/g, "");
     const hoy = new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
     const mañana = new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate() + 1);
     const countHoy = await pedidos.countDocuments({ fecha: { $gte: hoy, $lt: mañana } });
-
     const numeroPedido = `CTH-${fechaStr}-${String(countHoy + 1).padStart(3, "0")}`;
 
-    // 🧠 Guardar pedido en MongoDB
-    await pedidos.insertOne({ ...pedido, numeroPedido, fecha });
+    // Estructura del pedido
+    const nuevoPedido = {
+      numeroPedido,
+      email: pedido.email,
+      nombre: pedido.nombre || "Invitado",
+      telefono: pedido.telefono || "",
+      direccion: pedido.direccion || "",
+      ciudad: pedido.ciudad || "",
+      estado: pedido.estado || "",
+      cp: pedido.cp || "",
+      productos: pedido.productos,
+      total: pedido.total,
+      estado: "Pendiente",
+      fecha,
+    };
 
-    // 🧾 Generar tabla de productos
+    // Guardar en MongoDB
+    await pedidos.insertOne(nuevoPedido);
+
+    // Enviar correo notificación
     const productosHTML = pedido.productos
       .map(
         (p) => `
@@ -222,43 +239,33 @@ app.post("/registrar-pedido", async (req, res) => {
       )
       .join("");
 
-    // 💌 Plantilla HTML del correo
     const html = `
-      <div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;margin:auto;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;background:#f9fafb;">
+      <div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;margin:auto;border:1px solid #e5e7eb;border-radius:8px;background:#f9fafb;">
         <div style="background:#0f172a;color:white;padding:20px;text-align:center;">
-          <h2 style="margin:0;">🧾 Nueva compra en Computechh</h2>
-          <p style="margin:0;font-size:14px;">Número de pedido: <strong>${numeroPedido}</strong></p>
+          <h2>🧾 Nueva compra en Computechh</h2>
+          <p>Número de pedido: <strong>${numeroPedido}</strong></p>
         </div>
-
         <div style="padding:20px;">
-          <h3>📦 Detalles del comprador</h3>
           <p><strong>Nombre:</strong> ${pedido.nombre}</p>
           <p><strong>Correo:</strong> ${pedido.email}</p>
           <p><strong>Teléfono:</strong> ${pedido.telefono}</p>
           <p><strong>Dirección:</strong> ${pedido.direccion}, ${pedido.ciudad}, ${pedido.estado}, CP ${pedido.cp}</p>
-
-          <h3>🧰 Productos</h3>
+          <h3>Productos:</h3>
           <table style="width:100%;border-collapse:collapse;">
             <thead>
               <tr style="background:#e2e8f0;">
-                <th style="padding:8px;text-align:left;">Producto</th>
-                <th style="padding:8px;text-align:center;">Cant.</th>
-                <th style="padding:8px;text-align:right;">Precio</th>
+                <th style="text-align:left;padding:8px;">Producto</th>
+                <th style="text-align:center;padding:8px;">Cant.</th>
+                <th style="text-align:right;padding:8px;">Precio</th>
               </tr>
             </thead>
             <tbody>${productosHTML}</tbody>
           </table>
-
-          <h2 style="text-align:right;margin-top:20px;">💰 Total: $${pedido.total.toLocaleString()}</h2>
-        </div>
-
-        <div style="background:#0f172a;color:white;padding:10px;text-align:center;font-size:14px;">
-          <p>© ${new Date().getFullYear()} Computechh | computechh.soporte@gmail.com</p>
+          <h2 style="text-align:right;">Total: $${pedido.total.toLocaleString()}</h2>
         </div>
       </div>
     `;
 
-    // 📧 Enviar correo con el número de pedido
     await transporter.sendMail({
       from: '"Computechh Ventas" <computechh.soporte@gmail.com>',
       to: "computechh.soporte@gmail.com",
@@ -271,6 +278,27 @@ app.post("/registrar-pedido", async (req, res) => {
   } catch (err) {
     console.error("❌ Error registrando pedido:", err);
     res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/***********************************
+ * 🧩 OBTENER HISTORIAL DE PEDIDOS POR USUARIO
+ ***********************************/
+app.get("/ordenes/:email", async (req, res) => {
+  try {
+    const { email } = req.params;
+    const db = client.db("computechh");
+    const pedidos = db.collection("pedidos");
+
+    const ordenes = await pedidos
+      .find({ email })
+      .sort({ fecha: -1 })
+      .toArray();
+
+    res.json(ordenes);
+  } catch (err) {
+    console.error("❌ Error al obtener órdenes:", err);
+    res.status(500).json({ error: "Error al obtener órdenes" });
   }
 });
 

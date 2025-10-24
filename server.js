@@ -235,9 +235,8 @@ app.post("/crear-preferencia", async (req, res) => {
   } catch (err) {
     console.error("❌ Error creando preferencia:", err);
     res.status(500).json({ error: "Error del servidor" });
-  }
+  }git
 });
-
 
 /***********************************
  * 🚀 SERVIDOR

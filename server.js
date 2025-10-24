@@ -238,6 +238,27 @@ app.post("/crear-preferencia", async (req, res) => {
   }
 });
 
+/***********************************
+ * 📧 PRUEBA DE ENVÍO DE CORREO
+ ***********************************/
+app.get("/test-email", async (req, res) => {
+  try {
+    const info = await transporter.sendMail({
+      from: '"Computechh Soporte" <computechh.soporte@gmail.com>',
+      to: "computechh.soporte@gmail.com", // correo de destino (puedes cambiarlo)
+      subject: "📩 Prueba de correo desde el servidor Computechh",
+      text: "¡El envío de correo funciona correctamente! 🚀",
+    });
+
+    console.log("✅ Correo enviado:", info.messageId);
+    res.json({ ok: true, message: "Correo enviado correctamente ✅" });
+  } catch (err) {
+    console.error("❌ Error enviando correo:", err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+
 
 /***********************************
  * 🚀 SERVIDOR

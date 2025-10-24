@@ -199,6 +199,8 @@ app.post("/crear-preferencia", async (req, res) => {
     });
 
     const data = await response.json();
+    console.log("💳 Respuesta de Mercado Pago:", data);
+    
     res.json({ url: data.init_point });
   } catch (err) {
     console.error("Error al crear preferencia:", err);

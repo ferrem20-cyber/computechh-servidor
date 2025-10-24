@@ -184,6 +184,85 @@ app.get("/direcciones/:email", async (req, res) => {
   }
 });
 
+/***********************************
+ * 🧾 REGISTRAR PEDIDO Y ENVIAR CORREO HTML
+ ***********************************/
+app.post("/registrar-pedido", async (req, res) => {
+  try {
+    const pedido = req.body;
+    if (!pedido || !pedido.email || !pedido.productos) {
+      return res.status(400).json({ ok: false, error: "Datos de pedido incompletos" });
+    }
+
+    // 🧠 Guardar pedido en MongoDB
+    const db = client.db("computechh");
+    const pedidos = db.collection("pedidos");
+    await pedidos.insertOne({ ...pedido, fecha: new Date() });
+
+    // 🧾 Generar tabla de productos
+    const productosHTML = pedido.productos
+      .map(
+        (p) => `
+        <tr>
+          <td style="padding:8px;border-bottom:1px solid #ddd;">${p.nombre}</td>
+          <td style="padding:8px;border-bottom:1px solid #ddd;text-align:center;">${p.cantidad}</td>
+          <td style="padding:8px;border-bottom:1px solid #ddd;text-align:right;">$${p.precio_unitario.toLocaleString()}</td>
+        </tr>`
+      )
+      .join("");
+
+    // 💌 Plantilla de correo con formato HTML
+    const html = `
+      <div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;margin:auto;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;background:#f9fafb;">
+        <div style="background:#0f172a;color:white;padding:20px;text-align:center;">
+          <h2 style="margin:0;">🧾 Nueva compra en Computechh</h2>
+        </div>
+
+        <div style="padding:20px;">
+          <h3>📦 Detalles del comprador</h3>
+          <p><strong>Nombre:</strong> ${pedido.nombre}</p>
+          <p><strong>Correo:</strong> ${pedido.email}</p>
+          <p><strong>Teléfono:</strong> ${pedido.telefono}</p>
+          <p><strong>Dirección:</strong> ${pedido.direccion}, ${pedido.ciudad}, ${pedido.estado}, CP ${pedido.cp}</p>
+
+          <h3>🧰 Productos</h3>
+          <table style="width:100%;border-collapse:collapse;">
+            <thead>
+              <tr style="background:#e2e8f0;">
+                <th style="padding:8px;text-align:left;">Producto</th>
+                <th style="padding:8px;text-align:center;">Cant.</th>
+                <th style="padding:8px;text-align:right;">Precio</th>
+              </tr>
+            </thead>
+            <tbody>${productosHTML}</tbody>
+          </table>
+
+          <h2 style="text-align:right;margin-top:20px;">💰 Total: $${pedido.total.toLocaleString()}</h2>
+        </div>
+
+        <div style="background:#0f172a;color:white;padding:10px;text-align:center;font-size:14px;">
+          <p>© ${new Date().getFullYear()} Computechh | computechh.soporte@gmail.com</p>
+        </div>
+      </div>
+    `;
+
+    // 📧 Enviar correo a tu cuenta de soporte
+    await transporter.sendMail({
+      from: '"Computechh Ventas" <computechh.soporte@gmail.com>',
+      to: "computechh.soporte@gmail.com", // puedes agregar más destinatarios separados por coma
+      subject: "🧾 Nueva compra en Computechh",
+      html,
+    });
+
+    console.log("✅ Pedido guardado y correo HTML enviado correctamente");
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("❌ Error registrando pedido:", err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+
 
 /***********************************
  * 🪙 MERCADO PAGO (YA EXISTENTE)
@@ -235,7 +314,7 @@ app.post("/crear-preferencia", async (req, res) => {
   } catch (err) {
     console.error("❌ Error creando preferencia:", err);
     res.status(500).json({ error: "Error del servidor" });
-  }git
+  }
 });
 
 /***********************************

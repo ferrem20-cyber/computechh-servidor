@@ -267,11 +267,13 @@ app.post("/registrar-pedido", async (req, res) => {
     `;
 
     await transporter.sendMail({
-      from: '"Computechh Ventas" <computechh.soporte@gmail.com>',
-      to: "computechh.soporte@gmail.com",
-      subject: `🧾 Nueva compra (${numeroPedido})`,
-      html,
-    });
+  from: '"Computechh Ventas" <computechh.soporte@gmail.com>',
+  to: "computechh.soporte@gmail.com", // correo del negocio
+  cc: pedido.email, // 👈 copia al cliente (si está logueado)
+  subject: `🧾 Confirmación de compra (${numeroPedido})`,
+  html,
+});
+
 
     console.log(`✅ Pedido ${numeroPedido} guardado y correo enviado`);
     res.json({ ok: true, numeroPedido });

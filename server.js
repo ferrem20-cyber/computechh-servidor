@@ -178,21 +178,21 @@ app.get("/direcciones/:email", async (req, res) => {
 /***********************************
  * 🪙 MERCADO PAGO (YA EXISTENTE)
  ***********************************/
-app.post("/crear-preferencia", async (req, res) => {g
+app.post("/crear-preferencia", async (req, res) => {
   try {
     const { title, price } = req.body;
 
-    if (!price || isNaN(price)) {
-      console.error("❌ Precio inválido recibido:", price);
-      return res.status(400).json({ error: "Precio inválido o indefinido" });
-    }
-
     console.log("🛒 Creando preferencia con:", { title, price });
+
+    if (!title || !price || isNaN(price) || price <= 0) {
+      console.error("❌ Precio inválido recibido:", price);
+      return res.status(400).json({ error: "Precio inválido o faltante" });
+    }
 
     const response = await fetch("https://api.mercadopago.com/checkout/preferences", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer APP_USR-4643369270008836-101220-29b0c1ee3c2dd02eb8d1d8e082c445b5-2919258415`, // token actual
+        "Authorization": `Bearer APP_USR-4643369270008836-101220-29b0c1ee3c2dd02eb8d1d8e082c445b5-2919258415`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -214,20 +214,20 @@ app.post("/crear-preferencia", async (req, res) => {g
     });
 
     const data = await response.json();
-    console.log("💳 Respuesta de Mercado Pago:", data); // 👈 importante
+    console.log("💳 Respuesta de Mercado Pago:", data);
 
-    if (data.init_point) {
-      res.json({ url: data.init_point });
-    } else {
-      console.error("❌ Error creando preferencia:", data);
-      res.status(400).json({ error: "No se pudo crear preferencia", detalle: data });
+    if (!data.init_point) {
+      console.error("❌ No se recibió init_point:", data);
+      return res.status(400).json({ error: "Error al crear preferencia", detalle: data });
     }
 
+    res.json({ url: data.init_point });
   } catch (err) {
-    console.error("❌ Error en /crear-preferencia:", err);
-    res.status(500).json({ error: "Error interno del servidor" });
+    console.error("❌ Error creando preferencia:", err);
+    res.status(500).json({ error: "Error del servidor" });
   }
 });
+
 
 /***********************************
  * 🚀 SERVIDOR

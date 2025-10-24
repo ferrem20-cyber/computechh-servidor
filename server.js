@@ -178,7 +178,7 @@ app.get("/direcciones/:email", async (req, res) => {
 /***********************************
  * 🪙 MERCADO PAGO (YA EXISTENTE)
  ***********************************/
-app.post("/crear-preferencia", async (req, res) => {
+app.post("/crear-preferencia", async (req, res) => {g
   try {
     const { title, price } = req.body;
 
@@ -192,7 +192,7 @@ app.post("/crear-preferencia", async (req, res) => {
     const response = await fetch("https://api.mercadopago.com/checkout/preferences", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer APP_USR-c3870505-5a37-4038-b4f0-51ba450bc7a5`, // token actual
+        "Authorization": `Bearer APP_USR-4643369270008836-101220-29b0c1ee3c2dd02eb8d1d8e082c445b5-2919258415`, // token actual
         "Content-Type": "application/json",
       },
       body: JSON.stringify({

@@ -185,7 +185,7 @@ app.get("/direcciones/:email", async (req, res) => {
 });
 
 /***********************************
- * 🧾 REGISTRAR PEDIDO Y ENVIAR CORREO HTML
+ * 🧾 REGISTRAR PEDIDO Y ENVIAR CORREO HTML (CON ID ÚNICO)
  ***********************************/
 app.post("/registrar-pedido", async (req, res) => {
   try {
@@ -194,10 +194,21 @@ app.post("/registrar-pedido", async (req, res) => {
       return res.status(400).json({ ok: false, error: "Datos de pedido incompletos" });
     }
 
-    // 🧠 Guardar pedido en MongoDB
+    // 🧩 Generar un ID único para el pedido (ejemplo: CTH-20251023-001)
+    const fecha = new Date();
+    const fechaStr = fecha.toISOString().slice(0, 10).replace(/-/g, ""); // 20251023
     const db = client.db("computechh");
     const pedidos = db.collection("pedidos");
-    await pedidos.insertOne({ ...pedido, fecha: new Date() });
+
+    // Contar cuántos pedidos hay hoy para generar el consecutivo
+    const hoy = new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
+    const mañana = new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate() + 1);
+    const countHoy = await pedidos.countDocuments({ fecha: { $gte: hoy, $lt: mañana } });
+
+    const numeroPedido = `CTH-${fechaStr}-${String(countHoy + 1).padStart(3, "0")}`;
+
+    // 🧠 Guardar pedido en MongoDB
+    await pedidos.insertOne({ ...pedido, numeroPedido, fecha });
 
     // 🧾 Generar tabla de productos
     const productosHTML = pedido.productos
@@ -211,11 +222,12 @@ app.post("/registrar-pedido", async (req, res) => {
       )
       .join("");
 
-    // 💌 Plantilla de correo con formato HTML
+    // 💌 Plantilla HTML del correo
     const html = `
       <div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;margin:auto;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;background:#f9fafb;">
         <div style="background:#0f172a;color:white;padding:20px;text-align:center;">
           <h2 style="margin:0;">🧾 Nueva compra en Computechh</h2>
+          <p style="margin:0;font-size:14px;">Número de pedido: <strong>${numeroPedido}</strong></p>
         </div>
 
         <div style="padding:20px;">
@@ -246,16 +258,16 @@ app.post("/registrar-pedido", async (req, res) => {
       </div>
     `;
 
-    // 📧 Enviar correo a tu cuenta de soporte
+    // 📧 Enviar correo con el número de pedido
     await transporter.sendMail({
       from: '"Computechh Ventas" <computechh.soporte@gmail.com>',
-      to: "computechh.soporte@gmail.com", // puedes agregar más destinatarios separados por coma
-      subject: "🧾 Nueva compra en Computechh",
+      to: "computechh.soporte@gmail.com",
+      subject: `🧾 Nueva compra (${numeroPedido})`,
       html,
     });
 
-    console.log("✅ Pedido guardado y correo HTML enviado correctamente");
-    res.json({ ok: true });
+    console.log(`✅ Pedido ${numeroPedido} guardado y correo enviado`);
+    res.json({ ok: true, numeroPedido });
   } catch (err) {
     console.error("❌ Error registrando pedido:", err);
     res.status(500).json({ ok: false, error: err.message });

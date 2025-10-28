@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import fetch from "node-fetch";
-import { MongoClient } from "mongodb";
+import { MongoClient, ObjectId } from "mongodb"; // ✅ AÑADIDO ObjectId
 import fs from "fs";
 import nodemailer from "nodemailer";
 
@@ -260,8 +260,6 @@ app.get("/direcciones/:email", async (req, res) => {
     res.json([]);
   }
 });
-
-
 
 
 

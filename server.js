@@ -185,6 +185,73 @@ app.get("/direcciones/:email", async (req, res) => {
 });
 
 /***********************************
+ * 📦 CRUD de Direcciones
+ ***********************************/
+
+// ➕ Agregar dirección
+app.post("/agregar-direccion", async (req, res) => {
+  try {
+    const { email, nombre, direccion, ciudad, estado, cp } = req.body;
+
+    if (!email || !direccion) {
+      return res.status(400).json({ ok: false, error: "Datos incompletos" });
+    }
+
+    const db = client.db("computechh");
+    const direcciones = db.collection("direcciones");
+
+    await direcciones.insertOne({ email, nombre, direccion, ciudad, estado, cp, fecha: new Date() });
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("❌ Error en /agregar-direccion:", err);
+    res.status(500).json({ ok: false, error: "Error del servidor" });
+  }
+});
+
+// ✏️ Editar dirección
+app.put("/editar-direccion", async (req, res) => {
+  try {
+    const { id, email, nombre, direccion, ciudad, estado, cp } = req.body;
+
+    if (!id) return res.status(400).json({ ok: false, error: "ID faltante" });
+
+    const db = client.db("computechh");
+    const direcciones = db.collection("direcciones");
+
+    await direcciones.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { nombre, direccion, ciudad, estado, cp } }
+    );
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("❌ Error en /editar-direccion:", err);
+    res.status(500).json({ ok: false, error: "Error del servidor" });
+  }
+});
+
+// 🗑️ Eliminar dirección
+app.delete("/eliminar-direccion/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!id) return res.status(400).json({ ok: false, error: "ID faltante" });
+
+    const db = client.db("computechh");
+    const direcciones = db.collection("direcciones");
+
+    await direcciones.deleteOne({ _id: new ObjectId(id) });
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("❌ Error en /eliminar-direccion:", err);
+    res.status(500).json({ ok: false, error: "Error del servidor" });
+  }
+});
+
+
+/***********************************
  * 🧾 REGISTRAR PEDIDO Y ENVIAR CORREO HTML (CON ID ÚNICO)--- GUARDAR PEDIDO EN HISTORIAL
  ***********************************/
 /***********************************
@@ -252,6 +319,12 @@ function generarHTMLPedido(pedido, numeroPedido, incluirGracias = false) {
     )
     .join("");
 
+  // ✅ Mensaje de WhatsApp con número y texto personalizado
+  const mensajeWhatsApp = encodeURIComponent(
+    `Hola, acabo de realizar una compra en Computechh con el número de pedido ${numeroPedido} y quiero consultar el estado.`
+  );
+  const enlaceWhatsApp = `https://wa.me/526621838339?text=${mensajeWhatsApp}`;
+
   return `
     <div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;margin:auto;border:1px solid #e5e7eb;border-radius:8px;background:#f9fafb;overflow:hidden;">
       
@@ -267,7 +340,7 @@ function generarHTMLPedido(pedido, numeroPedido, incluirGracias = false) {
         ¡Gracias por tu compra en <strong>Computechh</strong>! 🎉<br>
         Te contactaremos pronto con los detalles de envío.
         <br><br>
-        <a href="https://wa.me/526621838339" 
+        <a href="${enlaceWhatsApp}" 
            style="display:inline-block;margin-top:10px;padding:10px 20px;background:#25d366;color:white;text-decoration:none;border-radius:6px;font-weight:bold;"
            target="_blank">📱 Contactar soporte</a>
       </div>
@@ -302,6 +375,7 @@ function generarHTMLPedido(pedido, numeroPedido, incluirGracias = false) {
     </div>
   `;
 }
+
 
 
 

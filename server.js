@@ -443,8 +443,11 @@ app.get("/ordenes/:email", async (req, res) => {
 
 
 /***********************************
- * 🪙 MERCADO PAGO (YA EXISTENTE)
+ * 🪙 MERCADO PAGO — PREFERENCIA + WEBHOOK
  ***********************************/
+import crypto from "crypto";
+
+// ✅ Crea preferencia de pago
 app.post("/crear-preferencia", async (req, res) => {
   try {
     const { title, price } = req.body;
@@ -459,7 +462,7 @@ app.post("/crear-preferencia", async (req, res) => {
     const response = await fetch("https://api.mercadopago.com/checkout/preferences", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer APP_USR-4643369270008836-101220-29b0c1ee3c2dd02eb8d1d8e082c445b5-2919258415`,
+        Authorization: `Bearer APP_USR-4643369270008836-101220-29b0c1ee3c2dd02eb8d1d8e082c445b5-2919258415`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -477,6 +480,8 @@ app.post("/crear-preferencia", async (req, res) => {
           pending: "https://computechh.netlify.app/pago-pendiente.html",
         },
         auto_return: "approved",
+        // ✅ URL de tu servidor para recibir notificaciones
+        notification_url: "https://computechh-servidor-2.onrender.com/webhook",
       }),
     });
 
@@ -494,6 +499,70 @@ app.post("/crear-preferencia", async (req, res) => {
     res.status(500).json({ error: "Error del servidor" });
   }
 });
+
+/***********************************
+ * 🔔 WEBHOOK DE MERCADO PAGO
+ ***********************************/
+app.post("/webhook", async (req, res) => {
+  try {
+    console.log("📬 Webhook recibido:", req.body);
+
+    const { type, data } = req.body;
+
+    // Solo procesar pagos aprobados
+    if (type === "payment" && data.id) {
+      const paymentId = data.id;
+
+      const paymentRes = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+        headers: {
+          Authorization: `Bearer APP_USR-4643369270008836-101220-29b0c1ee3c2dd02eb8d1d8e082c445b5-2919258415`,
+        },
+      });
+
+      const paymentData = await paymentRes.json();
+      console.log("💰 Datos del pago recibido:", paymentData);
+
+      if (paymentData.status === "approved") {
+        const db = client.db("computechh");
+        const pedidos = db.collection("pedidos");
+
+        // Evitar duplicados
+        const existente = await pedidos.findOne({ id_pago: paymentId });
+        if (existente) {
+          console.log("⚠️ Pedido ya registrado, se omite.");
+          return res.sendStatus(200);
+        }
+
+        const numeroPedido = `CTH-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${paymentId.slice(-5)}`;
+        const nuevoPedido = {
+          id_pago: paymentId,
+          numeroPedido,
+          nombre: paymentData.payer.first_name || "Cliente",
+          email: paymentData.payer.email,
+          productos: [
+            {
+              nombre: paymentData.description || "Compra en Computechh",
+              cantidad: 1,
+              precio_unitario: paymentData.transaction_amount,
+            },
+          ],
+          total: paymentData.transaction_amount,
+          estado: "Aprobado",
+          fecha: new Date(),
+        };
+
+        await pedidos.insertOne(nuevoPedido);
+        console.log(`✅ Pedido ${numeroPedido} guardado automáticamente desde webhook`);
+      }
+    }
+
+    res.sendStatus(200);
+  } catch (err) {
+    console.error("❌ Error procesando webhook:", err);
+    res.sendStatus(500);
+  }
+});
+
 
 /***********************************
  * 🚀 SERVIDOR

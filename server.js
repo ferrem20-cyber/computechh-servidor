@@ -503,13 +503,57 @@ app.post("/crear-preferencia", async (req, res) => {
 /***********************************
  * 🔔 WEBHOOK DE MERCADO PAGO
  ***********************************/
+
+// ✅ Reutilizamos tu template para correos
+function generarHTMLPedidoWebhook(pedido, incluirGracias = false) {
+  const productosHTML = pedido.productos
+    .map(
+      (p) => `
+      <tr>
+        <td style="padding:8px;border-bottom:1px solid #ddd;">${p.nombre}</td>
+        <td style="padding:8px;border-bottom:1px solid #ddd;text-align:center;">${p.cantidad}</td>
+        <td style="padding:8px;border-bottom:1px solid #ddd;text-align:right;">$${p.precio_unitario.toLocaleString()}</td>
+      </tr>`
+    )
+    .join("");
+
+  return `
+    <div style="font-family:Arial;max-width:600px;margin:auto;padding:20px;border:1px solid #ddd;border-radius:6px;">
+      <h2 style="color:#0ea5e9;text-align:center;">🧾 Compra Aprobada en Computechh</h2>
+      <p><strong>Número de pedido:</strong> ${pedido.numeroPedido}</p>
+      <p><strong>Cliente:</strong> ${pedido.nombre}</p>
+      <p><strong>Email:</strong> ${pedido.email}</p>
+
+      <h3>Productos:</h3>
+      <table style="width:100%;border-collapse:collapse;">
+        <thead>
+          <tr style="background:#eee;">
+            <th style="padding:8px;text-align:left;">Producto</th>
+            <th style="padding:8px;text-align:center;">Cant.</th>
+            <th style="padding:8px;text-align:right;">Precio</th>
+          </tr>
+        </thead>
+        <tbody>${productosHTML}</tbody>
+      </table>
+
+      <h2 style="text-align:right;">Total: $${pedido.total.toLocaleString()}</h2>
+
+      ${
+        incluirGracias
+          ? `<p style="margin-top:10px;">🚚 ¡Gracias por tu compra! Pronto recibirás información de envío.</p>`
+          : ""
+      }
+    </div>
+  `;
+}
+
+
 app.post("/webhook", async (req, res) => {
   try {
     console.log("📬 Webhook recibido:", req.body);
 
     const { type, data } = req.body;
 
-    // Solo procesar pagos aprobados
     if (type === "payment" && data.id) {
       const paymentId = data.id;
 
@@ -529,7 +573,7 @@ app.post("/webhook", async (req, res) => {
         // Evitar duplicados
         const existente = await pedidos.findOne({ id_pago: paymentId });
         if (existente) {
-          console.log("⚠️ Pedido ya registrado, se omite.");
+          console.log("⚠️ Pedido ya registrado desde webhook.");
           return res.sendStatus(200);
         }
 
@@ -552,7 +596,25 @@ app.post("/webhook", async (req, res) => {
         };
 
         await pedidos.insertOne(nuevoPedido);
-        console.log(`✅ Pedido ${numeroPedido} guardado automáticamente desde webhook`);
+        console.log(`✅ Pedido ${numeroPedido} guardado desde webhook`);
+
+        // 📧 Enviar correo al cliente
+        if (nuevoPedido.email) {
+          await transporter.sendMail({
+            from: '"Computechh Ventas" <computechh.soporte@gmail.com>',
+            to: nuevoPedido.email,
+            subject: `✅ Tu compra fue aprobada (${numeroPedido})`,
+            html: generarHTMLPedidoWebhook(nuevoPedido, true),
+          });
+        }
+
+        // 📧 Enviar copia a Computechh
+        await transporter.sendMail({
+          from: '"Computechh Ventas" <computechh.soporte@gmail.com>',
+          to: "computechh.soporte@gmail.com",
+          subject: `🧾 Nueva compra aprobada (${numeroPedido})`,
+          html: generarHTMLPedidoWebhook(nuevoPedido, false),
+        });
       }
     }
 
@@ -562,6 +624,7 @@ app.post("/webhook", async (req, res) => {
     res.sendStatus(500);
   }
 });
+
 
 
 /***********************************

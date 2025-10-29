@@ -654,50 +654,54 @@ app.post("/webhook", async (req, res) => {
   }
 });
 
-// 🧾 Obtener TODOS los pedidos (vista admin)
-app.get("/admin/ordenes", async (req, res) => {
+
+
+// 🚚 Actualizar estado, guía y paquetería
+app.put("/admin/actualizar-envio", async (req, res) => {
   try {
-    const { estado, email, numeroPedido } = req.query;
-    const db = client.db("computechh");
-    const pedidos = db.collection("pedidos");
-
-    // 🔍 Filtros dinámicos
-    const filtro = {};
-
-    if (estado) filtro.estado = estado;
-    if (email) filtro.email = email;
-    if (numeroPedido) filtro.numeroPedido = numeroPedido;
-
-    const ordenes = await pedidos
-      .find(filtro)
-      .sort({ fechaCreacion: -1 })
-      .toArray();
-
-    res.json(ordenes);
-  } catch (err) {
-    console.error("❌ Error /admin/ordenes:", err);
-    res.status(500).json({ error: "Error al obtener pedidos" });
-  }
-});
-
-
-// ✅ Actualizar estado del pedido manualmente (en panel o admin)
-app.put("/actualizar-estado", async (req, res) => {
-  try {
-    const { numeroPedido, estado } = req.body;
+    const { numeroPedido, estado, guia, paqueteria } = req.body;
     const db = client.db("computechh");
     const pedidos = db.collection("pedidos");
 
     await pedidos.updateOne(
       { numeroPedido },
-      { $set: { estado, ultActualizacion: new Date() }}
+      {
+        $set: {
+          estado,
+          guia: guia || null,
+          paqueteria: paqueteria || null,
+          ultActualizacion: new Date()
+        }
+      }
     );
+
+    // 📬 Si se marcó como enviado, notificar por correo
+    if (estado === "Enviado") {
+      const pedido = await pedidos.findOne({ numeroPedido });
+
+      await transporter.sendMail({
+        from: '"Computechh Envíos" <computechh.soporte@gmail.com>',
+        to: pedido.email,
+        subject: `📦 Tu pedido ha sido enviado (${numeroPedido})`,
+        html: `
+          <h2>¡Buenas noticias!</h2>
+          <p>Tu pedido <strong>${numeroPedido}</strong> ha sido enviado.</p>
+          <p><strong>Paquetería:</strong> ${paqueteria}</p>
+          <p><strong>Número de guía:</strong> ${guia}</p>
+          <p>Puedes rastrearlo desde la página oficial de la paquetería.</p>
+          <br>
+          <p>Gracias por tu compra 🖤</p>
+        `
+      });
+    }
 
     res.json({ ok: true });
   } catch (err) {
+    console.error("❌ Error /admin/actualizar-envio", err);
     res.status(500).json({ ok: false });
   }
 });
+
 
 
 

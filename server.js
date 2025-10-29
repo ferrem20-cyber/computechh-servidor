@@ -463,7 +463,7 @@ app.post("/crear-preferencia", async (req, res) => {
     const response = await fetch("https://api.mercadopago.com/checkout/preferences", {
       method: "POST",
       headers: {
-        Authorization: `Bearer APP_USR-4643369270008836-101220-29b0c1ee3c2dd02eb8d1d8e082c445b5-2919258415`,
+        Authorization: `Bearer APP_USR-1491604026148229-101220-fc0b04da22e3cb35854e8e8519c852de-68267553`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -558,7 +558,7 @@ app.post("/webhook", async (req, res) => {
     if (req.body.topic === "merchant_order") {
       const merchantRes = await fetch(req.body.resource, {
         headers: {
-          Authorization: `Bearer APP_USR-4643369270008836-101220-29b0c1ee3c2dd02eb8d1d8e082c445b5-2919258415`,
+          Authorization: `Bearer APP_USR-1491604026148229-101220-fc0b04da22e3cb35854e8e8519c852de-68267553`,
         },
       });
 
@@ -580,7 +580,7 @@ app.post("/webhook", async (req, res) => {
     // ✅ Consultar datos del pago
     const paymentRes = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
       headers: {
-        Authorization: `Bearer APP_USR-4643369270008836-101220-29b0c1ee3c2dd02eb8d1d8e082c445b5-2919258415`,
+        Authorization: `Bearer APP_USR-1491604026148229-101220-fc0b04da22e3cb35854e8e8519c852de-68267553`,
       },
     });
 

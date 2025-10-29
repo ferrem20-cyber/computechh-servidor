@@ -440,7 +440,7 @@ app.get("/ordenes/:email", async (req, res) => {
 
     const ordenes = await pedidos
       .find({ email })
-      .sort({ fecha: -1 })
+      .sort({ fechaCreacion: -1 })
       .toArray();
 
     res.json(ordenes);

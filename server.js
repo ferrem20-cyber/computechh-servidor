@@ -655,6 +655,20 @@ app.post("/webhook", async (req, res) => {
 });
 
 
+// 🔐 Login ADMIN super básico (password hardcodeado)
+const ADMIN_PASSWORD = "computechh2025"; // cambia por lo que quieras
+
+app.post("/admin-login", (req, res) => {
+  const { password } = req.body;
+
+  if (password === ADMIN_PASSWORD) {
+    return res.json({ ok: true });
+  }
+
+  return res.status(401).json({ ok: false, error: "Contraseña incorrecta" });
+});
+
+
 
 // 🚚 Actualizar estado, guía y paquetería
 app.put("/admin/actualizar-envio", async (req, res) => {

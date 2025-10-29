@@ -303,7 +303,10 @@ app.post("/registrar-pedido", async (req, res) => {
       pagado: false,
       id_pago: null,
       fechaCreacion: fecha,
-      fechaPago: null
+      fechaPago: null,
+      guia: null,
+      paqueteria: null,
+      ultActualizacion: new Date(),
     };
 
     // Guardar en MongoDB
@@ -648,6 +651,51 @@ app.post("/webhook", async (req, res) => {
   } catch (err) {
     console.error("❌ Error procesando webhook:", err);
     res.sendStatus(500);
+  }
+});
+
+// 🧾 Obtener TODOS los pedidos (vista admin)
+app.get("/admin/ordenes", async (req, res) => {
+  try {
+    const { estado, email, numeroPedido } = req.query;
+    const db = client.db("computechh");
+    const pedidos = db.collection("pedidos");
+
+    // 🔍 Filtros dinámicos
+    const filtro = {};
+
+    if (estado) filtro.estado = estado;
+    if (email) filtro.email = email;
+    if (numeroPedido) filtro.numeroPedido = numeroPedido;
+
+    const ordenes = await pedidos
+      .find(filtro)
+      .sort({ fechaCreacion: -1 })
+      .toArray();
+
+    res.json(ordenes);
+  } catch (err) {
+    console.error("❌ Error /admin/ordenes:", err);
+    res.status(500).json({ error: "Error al obtener pedidos" });
+  }
+});
+
+
+// ✅ Actualizar estado del pedido manualmente (en panel o admin)
+app.put("/actualizar-estado", async (req, res) => {
+  try {
+    const { numeroPedido, estado } = req.body;
+    const db = client.db("computechh");
+    const pedidos = db.collection("pedidos");
+
+    await pedidos.updateOne(
+      { numeroPedido },
+      { $set: { estado, ultActualizacion: new Date() }}
+    );
+
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ ok: false });
   }
 });
 

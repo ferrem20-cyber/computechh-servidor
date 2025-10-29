@@ -300,12 +300,16 @@ app.post("/registrar-pedido", async (req, res) => {
       productos: pedido.productos,
       total: pedido.total,
       estado: "Pendiente",
-      fecha,
+      pagado: false,
+      id_pago: null,
+      fechaCreacion: fecha,
+      fechaPago: null
     };
 
     // Guardar en MongoDB
     await pedidos.insertOne(nuevoPedido);
 
+   
     // Enviar correo notificación
     const productosHTML = pedido.productos
       .map(
@@ -411,8 +415,11 @@ if (pedido.email) {
 
 
 
-    console.log(`✅ Pedido ${numeroPedido} guardado y correo enviado`);
+    console.log(`✅ Pedido PRE-registrado: ${numeroPedido}`);
+
+    // Enviar numero de pedido al frontend
     res.json({ ok: true, numeroPedido });
+
   } catch (err) {
     console.error("❌ Error registrando pedido:", err);
     res.status(500).json({ ok: false, error: err.message });
@@ -592,43 +599,39 @@ app.post("/webhook", async (req, res) => {
     const db = client.db("computechh");
     const pedidos = db.collection("pedidos");
 
-    // ✅ Evitar duplicados
-    const existente = await pedidos.findOne({ id_pago: paymentId });
-    if (existente) return res.sendStatus(200);
-
-    // 💸 Configura tu costo de envío aquí
-    const SHIPPING_COST = 0;
-
-    const numeroPedido = `CTH-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${paymentId.slice(-5)}`;
-
-    const nuevoPedido = {
-      id_pago: paymentId,
-      numeroPedido,
-      nombre: paymentData.payer.first_name || "Cliente",
+    // ✅ Buscar el pedido más reciente sin pago
+    const pedido = await pedidos.findOne({
       email: paymentData.payer.email,
-      productos: [
-        {
-          nombre: paymentData.description || "Compra en Computechh",
-          cantidad: 1,
-          precio_unitario: paymentData.transaction_amount,
-        },
-      ],
-      envio: SHIPPING_COST,
-      total: paymentData.transaction_amount + SHIPPING_COST,
-      estado: "Aprobado",
-      fecha: new Date(),
-    };
+      pagado: false
+    }, { sort: { fechaCreacion: -1 }});
 
-    await pedidos.insertOne(nuevoPedido);
-    console.log(`✅ Pedido ${numeroPedido} guardado`);
+    if (!pedido) {
+      console.log("⚠️ No se encontró pedido pendiente");
+      return res.sendStatus(200);
+    }
+
+    // ✅ Actualizar pedido existente
+    await pedidos.updateOne(
+      { _id: pedido._id },
+      {
+        $set: {
+          id_pago: paymentId,
+          estado: "Aprobado",
+          pagado: true,
+          fechaPago: new Date()
+        }
+      }
+    );
+
+    console.log(`✅ Pedido actualizado: ${pedido.numeroPedido}`);
 
     // ✅ Correo al cliente
-    if (nuevoPedido.email) {
+    if (pedido.email) {
       await transporter.sendMail({
         from: '"Computechh Ventas" <computechh.soporte@gmail.com>',
-        to: nuevoPedido.email,
-        subject: `✅ Tu compra fue aprobada (${numeroPedido})`,
-        html: generarHTMLPedidoWebhook(nuevoPedido, true),
+        to: pedido.email,
+        subject: `✅ Tu compra fue aprobada (${pedido.numeroPedido})`,
+        html: generarHTMLPedidoWebhook(pedido, true),
       });
     }
 
@@ -636,8 +639,8 @@ app.post("/webhook", async (req, res) => {
     await transporter.sendMail({
       from: '"Computechh Ventas" <computechh.soporte@gmail.com>',
       to: "computechh.soporte@gmail.com",
-      subject: `🧾 Nueva compra aprobada (${numeroPedido})`,
-      html: generarHTMLPedidoWebhook(nuevoPedido, false),
+      subject: `🧾 Nueva compra aprobada (${pedido.numeroPedido})`,
+      html: generarHTMLPedidoWebhook(pedido, false),
     });
 
     res.sendStatus(200);

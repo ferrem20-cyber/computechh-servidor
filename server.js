@@ -445,6 +445,7 @@ app.get("/ordenes/:email", async (req, res) => {
 /***********************************
  * 🪙 MERCADO PAGO — PREFERENCIA + WEBHOOK
  ***********************************/
+
 import crypto from "crypto";
 
 // ✅ Crea preferencia de pago
@@ -547,78 +548,100 @@ function generarHTMLPedidoWebhook(pedido, incluirGracias = false) {
   `;
 }
 
-
 app.post("/webhook", async (req, res) => {
   try {
     console.log("📬 Webhook recibido:", req.body);
 
-    const { type, data } = req.body;
+    let paymentId = null;
 
-    if (type === "payment" && data.id) {
-      const paymentId = data.id;
-
-      const paymentRes = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+    // ✅ Modo nuevo de MercadoPago (merchant_order primero)
+    if (req.body.topic === "merchant_order") {
+      const merchantRes = await fetch(req.body.resource, {
         headers: {
           Authorization: `Bearer APP_USR-4643369270008836-101220-29b0c1ee3c2dd02eb8d1d8e082c445b5-2919258415`,
         },
       });
 
-      const paymentData = await paymentRes.json();
-      console.log("💰 Datos del pago recibido:", paymentData);
+      const merchantData = await merchantRes.json();
+      console.log("📦 Merchant Order:", merchantData);
 
-      if (paymentData.status === "approved") {
-        const db = client.db("computechh");
-        const pedidos = db.collection("pedidos");
-
-        // Evitar duplicados
-        const existente = await pedidos.findOne({ id_pago: paymentId });
-        if (existente) {
-          console.log("⚠️ Pedido ya registrado desde webhook.");
-          return res.sendStatus(200);
-        }
-
-        const numeroPedido = `CTH-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${paymentId.slice(-5)}`;
-        const nuevoPedido = {
-          id_pago: paymentId,
-          numeroPedido,
-          nombre: paymentData.payer.first_name || "Cliente",
-          email: paymentData.payer.email,
-          productos: [
-            {
-              nombre: paymentData.description || "Compra en Computechh",
-              cantidad: 1,
-              precio_unitario: paymentData.transaction_amount,
-            },
-          ],
-          total: paymentData.transaction_amount,
-          estado: "Aprobado",
-          fecha: new Date(),
-        };
-
-        await pedidos.insertOne(nuevoPedido);
-        console.log(`✅ Pedido ${numeroPedido} guardado desde webhook`);
-
-        // 📧 Enviar correo al cliente
-        if (nuevoPedido.email) {
-          await transporter.sendMail({
-            from: '"Computechh Ventas" <computechh.soporte@gmail.com>',
-            to: nuevoPedido.email,
-            subject: `✅ Tu compra fue aprobada (${numeroPedido})`,
-            html: generarHTMLPedidoWebhook(nuevoPedido, true),
-          });
-        }
-
-        // 📧 Enviar copia a Computechh
-        await transporter.sendMail({
-          from: '"Computechh Ventas" <computechh.soporte@gmail.com>',
-          to: "computechh.soporte@gmail.com",
-          subject: `🧾 Nueva compra aprobada (${numeroPedido})`,
-          html: generarHTMLPedidoWebhook(nuevoPedido, false),
-        });
+      if (merchantData.payments && merchantData.payments.length > 0) {
+        paymentId = merchantData.payments[0].id;
       }
     }
 
+    // ✅ Segundo tipo de webhook (payment directo)
+    if (req.body.type === "payment" && req.body.data.id) {
+      paymentId = req.body.data.id;
+    }
+
+    if (!paymentId) return res.sendStatus(200);
+
+    // ✅ Consultar datos del pago
+    const paymentRes = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+      headers: {
+        Authorization: `Bearer APP_USR-4643369270008836-101220-29b0c1ee3c2dd02eb8d1d8e082c445b5-2919258415`,
+      },
+    });
+
+    const paymentData = await paymentRes.json();
+    console.log("💰 Datos del pago:", paymentData);
+
+    if (paymentData.status !== "approved") return res.sendStatus(200);
+
+    const db = client.db("computechh");
+    const pedidos = db.collection("pedidos");
+
+    // ✅ Evitar duplicados
+    const existente = await pedidos.findOne({ id_pago: paymentId });
+    if (existente) return res.sendStatus(200);
+
+    // 💸 Configura tu costo de envío aquí
+    const SHIPPING_COST = 0;
+
+    const numeroPedido = `CTH-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${paymentId.slice(-5)}`;
+
+    const nuevoPedido = {
+      id_pago: paymentId,
+      numeroPedido,
+      nombre: paymentData.payer.first_name || "Cliente",
+      email: paymentData.payer.email,
+      productos: [
+        {
+          nombre: paymentData.description || "Compra en Computechh",
+          cantidad: 1,
+          precio_unitario: paymentData.transaction_amount,
+        },
+      ],
+      envio: SHIPPING_COST,
+      total: paymentData.transaction_amount + SHIPPING_COST,
+      estado: "Aprobado",
+      fecha: new Date(),
+    };
+
+    await pedidos.insertOne(nuevoPedido);
+    console.log(`✅ Pedido ${numeroPedido} guardado`);
+
+    // ✅ Correo al cliente
+    if (nuevoPedido.email) {
+      await transporter.sendMail({
+        from: '"Computechh Ventas" <computechh.soporte@gmail.com>',
+        to: nuevoPedido.email,
+        subject: `✅ Tu compra fue aprobada (${numeroPedido})`,
+        html: generarHTMLPedidoWebhook(nuevoPedido, true),
+      });
+    }
+
+    // ✅ Correo para ti
+    await transporter.sendMail({
+      from: '"Computechh Ventas" <computechh.soporte@gmail.com>',
+      to: "computechh.soporte@gmail.com",
+      subject: `🧾 Nueva compra aprobada (${numeroPedido})`,
+      html: generarHTMLPedidoWebhook(nuevoPedido, false),
+    });
+
     res.sendStatus(200);
+
   } catch (err) {
     console.error("❌ Error procesando webhook:", err);
     res.sendStatus(500);
